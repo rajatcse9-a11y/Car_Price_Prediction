@@ -4,6 +4,7 @@ import requests
 import streamlit as st
 
 # Local: FastAPI same laptop pe chal rahi hoti hai.
+# Render: Environment mein API_URL = https://<fastapi-service>.onrender.com
 API_URL = os.environ.get("API_URL", "http://127.0.0.1:8000").rstrip("/")
 
 st.set_page_config(page_title="Car Price Predictor", page_icon="🚗", layout="centered")

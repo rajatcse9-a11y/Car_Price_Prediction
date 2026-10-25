@@ -2,9 +2,6 @@
 
 A Machine Learning web application that predicts the estimated selling price of a car based on its features, such as brand, year, fuel type, transmission, kilometers driven, and other relevant attributes.
 
-
-## Live Demo-Link: 
-
 ## 📌 Project Overview
 
 The **Car Price Prediction** project uses Machine Learning to estimate car prices based on historical vehicle data. The application provides an interactive Streamlit interface where users can enter car details and get a predicted price.
@@ -39,7 +36,7 @@ Car-Price-Prediction/
 ├── numeric_ranges.pkl
 ├── requirements.txt
 ├── README.md
-└── .gitignore
+└── main.py
 ```
 
 *Note: Adjust the filenames above to match your actual repository structure.*
