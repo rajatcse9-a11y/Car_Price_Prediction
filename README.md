@@ -2,6 +2,10 @@
 
 A Machine Learning web application that predicts the estimated selling price of a car based on its features, such as brand, year, fuel type, transmission, kilometers driven, and other relevant attributes.
 
+## Public link
+Live Demo: https://car-price-prediction-1-q3rs.onrender.com
+API Docs:  https://car-price-prediction-w3uo.onrender.com/docs
+
 ## 📌 Project Overview
 
 The **Car Price Prediction** project uses Machine Learning to estimate car prices based on historical vehicle data. The application provides an interactive Streamlit interface where users can enter car details and get a predicted price.
