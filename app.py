@@ -1,67 +1,84 @@
-import numpy as np
-import pandas as pd
-import joblib
+import os
+
+import requests
 import streamlit as st
 
+# Local: FastAPI same laptop pe chal rahi hoti hai.
+API_URL = os.environ.get("API_URL", "http://127.0.0.1:8000").rstrip("/")
+
 st.set_page_config(page_title="Car Price Predictor", page_icon="🚗", layout="centered")
-
-# ---------------------------------------------------------
-# Load saved model + preprocessing artifacts
-# ---------------------------------------------------------
-@st.cache_resource
-def load_artifacts():
-    model = joblib.load("car_price_model.pkl")
-    encoders = joblib.load("encoders.pkl")
-    cat_cols = joblib.load("cat_cols.pkl")
-    feature_columns = joblib.load("feature_columns.pkl")
-    numeric_ranges = joblib.load("numeric_ranges.pkl")
-    return model, encoders, cat_cols, feature_columns, numeric_ranges
-
-model, encoders, cat_cols, feature_columns, numeric_ranges = load_artifacts()
-
-# Approx conversion rate from the dataset's original currency to INR.
-# Adjust this number if you want to match the current exchange rate.
-USD_TO_INR = 90
 
 st.title("🚗 Car Price Predictor")
 st.write("Fill in the car details below and get an estimated price.")
 
+
 # ---------------------------------------------------------
-# Build the input form dynamically from saved columns
+# Form options come from the FastAPI backend
 # ---------------------------------------------------------
-user_input = {}
+@st.cache_data(ttl=3600, show_spinner=False)
+def get_options():
+    # Timeout bada rakha hai, kyunki free tier pe API so jaati hai
+    response = requests.get(f"{API_URL}/options", timeout=90)
+    response.raise_for_status()
+    return response.json()
+
+
+try:
+    with st.spinner("Connecting to the prediction API..."):
+        options = get_options()
+except requests.RequestException as e:
+    st.error(f"API se connect nahi ho paya ({API_URL}). Error: {e}")
+    st.stop()
+
+feature_columns = options["feature_columns"]
+cat_cols = options["cat_cols"]
+categories = options["categories"]
+numeric_ranges = options["numeric_ranges"]
+
+
+# ---------------------------------------------------------
+# Build the form dynamically
+# ---------------------------------------------------------
+payload = {}
 
 with st.form("car_form"):
     for col in feature_columns:
+        # API ke fields mein space nahi hota ("Engine Type" -> "Engine_Type")
+        key = col.replace(" ", "_")
+
         if col in cat_cols:
-            # Dropdown using the original text categories the encoder learned
-            options = list(encoders[col].classes_)
-            choice = st.selectbox(col, options)
-            user_input[col] = encoders[col].transform([choice])[0]
+            payload[key] = st.selectbox(col, categories[col])
         else:
-            lo, hi = numeric_ranges.get(col, (0.0, 100.0))
-            default = float((lo + hi) / 2)
+            lo, hi = numeric_ranges.get(col, [0.0, 100.0])
+            default = (lo + hi) / 2
             if col == "Year":
-                # Year should always be a whole number, not a decimal
-                user_input[col] = st.number_input(
-                    col, min_value=int(lo), max_value=int(hi), value=int(default),
-                    step=1
+                payload[key] = st.number_input(
+                    col, min_value=int(lo), max_value=int(hi),
+                    value=int(default), step=1,
                 )
             else:
-                user_input[col] = st.number_input(
-                    col, min_value=float(lo), max_value=float(hi), value=default
+                payload[key] = st.number_input(
+                    col, min_value=float(lo), max_value=float(hi),
+                    value=float(default),
                 )
 
     submitted = st.form_submit_button("Predict Price")
 
+
 # ---------------------------------------------------------
-# Predict
+# Predict via the API
 # ---------------------------------------------------------
 if submitted:
-    input_df = pd.DataFrame([user_input])[feature_columns]
-    log_price_pred = model.predict(input_df)[0]
-    price_pred = np.exp(log_price_pred)  # undo the log transform from training
-    price_pred_inr = price_pred * USD_TO_INR
+    try:
+        with st.spinner("Predicting..."):
+            response = requests.post(f"{API_URL}/predict", json=payload, timeout=90)
 
-    st.success(f"### Estimated Price: ₹{price_pred_inr:,.2f}")
-    st.caption("Prediction based on a regression model trained on used-car sales data.")
+        if response.status_code == 200:
+            price = response.json()["predicted_price_inr"]
+            st.success(f"### Estimated Price: ₹{price:,.2f}")
+            st.caption("Prediction based on a regression model trained on used-car sales data.")
+        else:
+            st.error(f"API error {response.status_code}: {response.text}")
+
+    except requests.RequestException as e:
+        st.error(f"Request failed: {e}")
